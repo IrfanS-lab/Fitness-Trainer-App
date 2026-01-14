@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Main app theme (Compose + Material3 SAFE) -->
+    <style name="Theme.FitnessTrainerApp"
+        parent="android:Theme.Light.NoTitleBar">
+    </style>
+
+    <!-- Splash screen theme -->
+    <style name="Theme.FitnessTrainerApp.Splash"
+        parent="Theme.SplashScreen">
+
+        <!-- FIX: This now points to the adaptive icon XML, not a PNG -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/logo</item>
+
+        <item name="windowSplashScreenBackground">@android:color/white</item>
+
+        <item name="postSplashScreenTheme">
+            @style/Theme.FitnessTrainerApp
+        </item>
+    </style>
+
+</resources>

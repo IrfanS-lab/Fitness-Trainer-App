@@ -32,8 +32,9 @@ import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
 // --- Data classes to model the UI state ---
 data class Challenge(val id: Int, val title: String, val imageUrl: String)
 data class BottomNavItem(val label: String, val icon: ImageVector, val route: String)
-data class Category(val title: String)
+data class Category(val title: String, val route: String) // Added a route for navigation
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     // Hoist navigation events up to MainActivity
@@ -43,7 +44,11 @@ fun HomeScreen(
 ) {
     // State should ideally come from a ViewModel
     var searchQuery by remember { mutableStateOf("") }
-    val categories = listOf(Category("CUSTOM\nPLAN"), Category("LIVE\nSESSION"), Category("DIET\nPLAN"))
+    val categories = listOf(
+        Category("CUSTOM\nPLAN", "custom_plan"),
+        Category("LIVE\nSESSION", "live_session"),
+        Category("DIET\nPLAN", "diet_plan")
+    )
     val challenges = listOf(
         Challenge(1, "7 Day Full Body Workout", "https://images.pexels.com/photos/2294361/pexels-photo-2294361.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"),
         Challenge(2, "30 Day Abs Challenge", "https://images.pexels.com/photos/3775131/pexels-photo-3775131.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1")
@@ -68,33 +73,33 @@ fun HomeScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp)
+                .padding(paddingValues),
+            contentPadding = PaddingValues(horizontal = 16.dp)
         ) {
             // 1. Search Bar
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 SearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
+                Spacer(modifier = Modifier.height(20.dp))
             }
 
             // 2. Banner Card
             item {
-                Spacer(modifier = Modifier.height(20.dp))
                 WorkoutBanner()
+                Spacer(modifier = Modifier.height(20.dp))
             }
 
             // 3. Category Grid
             item {
-                Spacer(modifier = Modifier.height(20.dp))
                 CategoryRow(
                     categories = categories,
                     onCategoryClick = onCategoryClick
                 )
+                Spacer(modifier = Modifier.height(24.dp))
             }
 
             // 4. Trending Challenges Section Header
             item {
-                Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = "TRENDING CHALLENGES",
                     style = MaterialTheme.typography.titleMedium,
@@ -117,6 +122,7 @@ fun HomeScreen(
 
 // --- Reusable Sub-Components ---
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchBar(query: String, onQueryChange: (String) -> Unit) {
     OutlinedTextField(
@@ -149,6 +155,8 @@ fun WorkoutBanner() {
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
+        // Add a scrim for better text readability
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)))
         Text(
             text = "START\nYOUR\nWORKOUT",
             color = Color.White,
@@ -173,7 +181,7 @@ fun CategoryRow(categories: List<Category>, onCategoryClick: (String) -> Unit) {
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color(0xFFEFEFEF))
-                    .clickable { onCategoryClick(category.title) },
+                    .clickable { onCategoryClick(category.route) }, // Use the route for navigation
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -190,33 +198,45 @@ fun CategoryRow(categories: List<Category>, onCategoryClick: (String) -> Unit) {
 
 @Composable
 fun ChallengeCard(challenge: Challenge, onClick: () -> Unit) {
-    Box(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .height(160.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color.LightGray)
-            .clickable(onClick = onClick)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        AsyncImage(
-            model = challenge.imageUrl,
-            contentDescription = challenge.title,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
-            placeholder = painterResource(id = R.drawable.logo_fitness) // Optional placeholder
-        )
-        // Scrim for better text readability
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
-        Text(
-            text = challenge.title,
-            modifier = Modifier.align(Alignment.BottomStart).padding(16.dp),
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp
-        )
+        Box(contentAlignment = Alignment.BottomStart) {
+            AsyncImage(
+                model = challenge.imageUrl,
+                contentDescription = challenge.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(id = R.drawable.logo_fitness) // Optional placeholder
+            )
+            // Scrim for better text readability
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color.Black),
+                            startY = 300f // Adjust gradient start
+                        )
+                    )
+            )
+            Text(
+                text = challenge.title,
+                modifier = Modifier.padding(16.dp),
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+        }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BottomNavigationBar(items: List<BottomNavItem>, onItemClick: (String) -> Unit, currentRoute: String) {
     NavigationBar(

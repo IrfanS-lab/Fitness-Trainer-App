@@ -1,0 +1,207 @@
+package com.example.fitnesstrainerapp
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.*
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.example.fitnesstrainerapp.screen1.CreateAccountScreen
+import com.example.fitnesstrainerapp.screen1.LoginScreen
+import com.example.fitnesstrainerapp.screen1.WelcomeScreen
+import com.example.fitnesstrainerapp.screen2.CustomPlanScreen
+import com.example.fitnesstrainerapp.screen2.HomeScreen
+import com.example.fitnesstrainerapp.screen2.InboxScreen
+import com.example.fitnesstrainerapp.screen2.SettingsScreen
+import com.example.fitnesstrainerapp.screen2.ScheduleScreen
+import com.example.fitnesstrainerapp.screen2.ProfileScreen
+import com.example.fitnesstrainerapp.screen2.DietPlanScreen
+import com.example.fitnesstrainerapp.screen2.LiveSessionScreen
+import com.example.fitnesstrainerapp.screen3.CaloriesCalculatorScreen
+import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+
+        setContent {
+            FitnessTrainerAppTheme {
+                val navController = rememberNavController()
+
+                NavHost(
+                    navController = navController,
+                    startDestination = "welcome"
+                ) {
+
+                    /* ---------------- AUTH FLOW ---------------- */
+
+                    composable("welcome") {
+                        WelcomeScreen(
+                            onLoginClick = { navController.navigate("login") },
+                            onSignUpClick = { navController.navigate("create_account") }
+                        )
+                    }
+
+                    composable("create_account") {
+                        var email by remember { mutableStateOf("") }
+                        var password by remember { mutableStateOf("") }
+                        val isButtonEnabled = email.isNotEmpty() && password.isNotEmpty()
+
+                        CreateAccountScreen(
+                            emailState = email,
+                            passwordState = password,
+                            onEmailChange = { email = it },
+                            onPasswordChange = { password = it },
+                            isContinueButtonEnabled = isButtonEnabled,
+                            onContinueClick = {
+                                navController.navigate("home/$email") {
+                                    popUpTo("welcome") { inclusive = true }
+                                }
+                            },
+                            onLoginClick = { navController.navigate("login") }
+                        )
+                    }
+
+                    composable("login") {
+                        var email by remember { mutableStateOf("") }
+                        var password by remember { mutableStateOf("") }
+                        val isLoginEnabled = email.isNotEmpty() && password.isNotEmpty()
+
+                        LoginScreen(
+                            emailState = email,
+                            passwordState = password,
+                            onEmailChange = { email = it },
+                            onPasswordChange = { password = it },
+                            isLoginButtonEnabled = isLoginEnabled,
+                            onLoginClick = {
+                                navController.navigate("home/$email") {
+                                    popUpTo("welcome") { inclusive = true }
+                                }
+                            },
+                            onSignUpClick = { navController.navigate("create_account") }
+                        )
+                    }
+
+                    /* ---------------- HOME ---------------- */
+
+                    composable(
+                        route = "home/{email}",
+                        arguments = listOf(navArgument("email") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userEmail = backStackEntry.arguments?.getString("email") ?: ""
+
+                        HomeScreen(
+                            onNavItemClick = { route ->
+                                val destination = if (route == "profile" || route == "settings") {
+                                    "$route/$userEmail"
+                                } else {
+                                    route
+                                }
+
+                                navController.navigate(destination) {
+                                    launchSingleTop = true
+                                }
+                            },
+
+                            // ✅ FIXED: CATEGORY NAVIGATION
+                            onCategoryClick = { route ->
+                                navController.navigate(route)
+                            },
+
+                            onChallengeClick = { challengeId ->
+                                // Future challenge navigation
+                            }
+                        )
+                    }
+
+                    /* ---------------- PROFILE ---------------- */
+
+                    composable(
+                        route = "profile/{email}",
+                        arguments = listOf(navArgument("email") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userEmail = backStackEntry.arguments?.getString("email") ?: ""
+                        ProfileScreen(
+                            userEmail = userEmail,
+                            onNavigateBack = { navController.popBackStack() }
+                        )
+                    }
+
+                    /* ---------------- SETTINGS ---------------- */
+
+                    composable(
+                        route = "settings/{email}",
+                        arguments = listOf(navArgument("email") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userEmail = backStackEntry.arguments?.getString("email") ?: ""
+                        SettingsScreen(
+                            userEmail = userEmail,
+                            onNavigateBack = { navController.popBackStack() },
+                            onLogoutClick = {
+                                navController.navigate("welcome") {
+                                    popUpTo(navController.graph.id) { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+
+                    /* ---------------- OTHER SCREENS ---------------- */
+
+                    composable("notifications") {
+                        InboxScreen(
+                            onNavigateBack = { navController.popBackStack() }
+                        )
+                    }
+
+                    composable("schedule") {
+                        ScheduleScreen(
+                            onNavigateBack = { navController.popBackStack() }
+                        )
+                    }
+
+                    /* ---------------- DIET PLAN ---------------- */
+
+                    composable("diet_plan") {
+                        DietPlanScreen(
+                            onNavigateBack = { navController.popBackStack() },
+                            onCaloriesCalculatorClick = { navController.navigate("calories_calculator") }
+                        )
+                    }
+
+                    /* ---------------- LIVE SESSION ---------------- */
+                    composable("live_session") {
+                        LiveSessionScreen(
+                            onNavigateBack = {
+                                navController.popBackStack() // Go back to the previous screen (HomeScreen)
+                            }
+                        )
+                    }
+
+                    composable("custom_plan") {
+                        CustomPlanScreen(
+                            onNavigateBack = { navController.popBackStack() },
+                            onNavigateToProfile = { navController.navigate("profile/{userEmail}") }
+                        )
+                    }
+
+
+                    composable("calories_calculator") {
+                        CaloriesCalculatorScreen(
+                            onNavigateBack = {
+                                navController.popBackStack() // Go back to DietPlanScreen
+                            }
+                        )
+                    }
+
+                }
+            }
+        }
+    }
+}
