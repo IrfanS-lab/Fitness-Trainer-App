@@ -6,6 +6,11 @@ plugins {
 
 }
 
+kapt {
+    correctErrorTypes = true
+    includeCompileClasspath = false
+}
+
 android {
     namespace = "com.example.fitnesstrainerapp"
     compileSdk = 36
