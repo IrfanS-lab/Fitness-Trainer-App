@@ -2,6 +2,7 @@ package com.example.fitnesstrainerapp.screen2
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -38,6 +39,10 @@ fun ScheduleScreen(
 ) {
     // State for the currently displayed month, initialized to the current month
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
+    // Store marked days per month
+    var markedDaysPerMonth by remember {
+        mutableStateOf(mapOf(YearMonth.now() to setOf(15, 16, 17)))
+    }
 
     Scaffold(
         topBar = {
@@ -63,8 +68,18 @@ fun ScheduleScreen(
                     yearMonth = currentMonth,
                     onPrevMonth = { currentMonth = currentMonth.minusMonths(1) },
                     onNextMonth = { currentMonth = currentMonth.plusMonths(1) },
-                    // Example: mark some days in the current month
-                    markedDays = if (currentMonth == YearMonth.now()) setOf(15, 16, 17) else emptySet()
+                    // Pass the marked days for the currently displayed month
+                    markedDays = markedDaysPerMonth[currentMonth] ?: emptySet(),
+                    onDayClick = { day ->
+                        val currentDays = markedDaysPerMonth[currentMonth] ?: emptySet()
+                        val newDays = if (currentDays.contains(day)) {
+                            currentDays - day
+                        } else {
+                            currentDays + day
+                        }
+                        // Update the map with the new set of marked days for the current month
+                        markedDaysPerMonth = markedDaysPerMonth + (currentMonth to newDays)
+                    }
                 )
 
                 // You could add more months here if needed
@@ -80,7 +95,8 @@ fun CalendarView(
     yearMonth: YearMonth,
     onPrevMonth: () -> Unit,
     onNextMonth: () -> Unit,
-    markedDays: Set<Int>
+    markedDays: Set<Int>,
+    onDayClick: (Int) -> Unit
 ) {
     val daysInMonth = yearMonth.lengthOfMonth()
     val firstDayOfMonth = yearMonth.atDay(1).dayOfWeek
@@ -99,7 +115,8 @@ fun CalendarView(
         CalendarGrid(
             daysInMonth = daysInMonth,
             emptyCells = emptyCells,
-            markedDays = markedDays
+            markedDays = markedDays,
+            onDayClick = onDayClick
         )
     }
 }
@@ -146,12 +163,12 @@ fun DayOfWeekHeader() {
 }
 
 @Composable
-fun CalendarGrid(daysInMonth: Int, emptyCells: Int, markedDays: Set<Int>) {
+fun CalendarGrid(daysInMonth: Int, emptyCells: Int, markedDays: Set<Int>, onDayClick: (Int) -> Unit) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(7),
-        modifier = Modifier.height(((daysInMonth + emptyCells + 6) / 7 * 50).dp) // Dynamic height
+        modifier = Modifier.height(((daysInMonth + emptyCells + 6) / 7 * 50).dp)
     ) {
-        // Add empty cells for the start of the month
+        // 1. Empty cells
         items(emptyCells) {
             Box(
                 modifier = Modifier
@@ -160,25 +177,37 @@ fun CalendarGrid(daysInMonth: Int, emptyCells: Int, markedDays: Set<Int>) {
             )
         }
 
-        // Add the days of the month
+        // 2. Day cells
         items(daysInMonth) { day ->
-            val isMarked = (day + 1) in markedDays
+            val dateNumber = day + 1
+            val isMarked = dateNumber in markedDays
+
             Box(
                 modifier = Modifier
                     .size(50.dp)
-                    .background(Color(0xFFFFEBEE)) // Light pink background
-                    .border(0.5.dp, Color.White),
-                contentAlignment = Alignment.Center
+                    .background(Color(0xFFFFEBEE))
+                    .border(0.5.dp, Color.White)
+                    .clickable { onDayClick(dateNumber) }
+                // We removed contentAlignment here to use specific aligns below
             ) {
+                // The Number: Always Black, Always Centered
+                Text(
+                    text = dateNumber.toString(),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.Black,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+
+                // The Star: Smaller, Bottom Right
                 if (isMarked) {
                     Icon(
                         imageVector = Icons.Default.Star,
-                        contentDescription = "Marked Day",
-                        tint = Color(0xFF6A1B9A), // Dark purple
+                        contentDescription = "Marked",
+                        tint = Color(0xFF6A1B9A),
                         modifier = Modifier
-                            .size(32.dp)
-                            .background(Color.White, CircleShape)
-                            .padding(4.dp)
+                            .size(16.dp) // Much smaller size
+                            .align(Alignment.BottomEnd) // Puts it in bottom right corner
+                            .padding(2.dp) // Slight padding so it doesn't touch the edge
                     )
                 }
             }
