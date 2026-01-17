@@ -13,9 +13,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -31,6 +31,9 @@ fun DietPlanScreen(
     onNavigateBack: () -> Unit,
     onCaloriesCalculatorClick: () -> Unit
 ) {
+    // 1. Get the UriHandler to open links
+    val uriHandler = LocalUriHandler.current
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -53,7 +56,7 @@ fun DietPlanScreen(
             // Main banner card
             item {
                 DietCard(
-                    imageRes = R.drawable.diet_banner, // Replace with your image
+                    imageRes = R.drawable.diet_banner,
                     title = "Small Choices,\nBig Changes"
                 )
             }
@@ -67,7 +70,7 @@ fun DietPlanScreen(
                         .height(80.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFE0E0E0), // Light Gray
+                        containerColor = Color(0xFFE0E0E0),
                         contentColor = Color.Black
                     )
                 ) {
@@ -93,14 +96,19 @@ fun DietPlanScreen(
             // Daily Tip Cards
             item {
                 DietCard(
-                    imageRes = R.drawable.daily_tip_1, // Replace with your image
+                    imageRes = R.drawable.daily_tip_1,
                     title = "30 DAYS HEALTHY\nLIFESTYLE\nEATING PLAN"
                 )
             }
+
+            // 2. Updated Card with the URL Link
             item {
                 DietCard(
-                    imageRes = R.drawable.daily_tip_2, // Replace with your image
-                    title = "NO SUGAR\n14 DAY CHALLENGE"
+                    imageRes = R.drawable.daily_tip_2,
+                    title = "NO SUGAR\n14 DAY CHALLENGE",
+                    onClick = {
+                        uriHandler.openUri("https://www.plateandcanvas.com/14-day-no-sugar-diet-with-food-list-a-dietitian-s-guide")
+                    }
                 )
             }
         }
@@ -120,25 +128,22 @@ fun DietCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(180.dp)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick), // This makes the card clickable
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {
-            // Background Image
             Image(
                 painter = painterResource(id = imageRes),
                 contentDescription = title,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
-            // Scrim for better text readability
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.3f))
             )
-            // Overlay Text
             Text(
                 text = title,
                 color = Color.White,
@@ -150,8 +155,6 @@ fun DietCard(
         }
     }
 }
-
-// --- Preview ---
 
 @Preview(showBackground = true)
 @Composable
