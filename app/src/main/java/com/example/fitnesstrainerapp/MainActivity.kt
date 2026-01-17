@@ -1,10 +1,12 @@
 package com.example.fitnesstrainerapp
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -24,16 +26,22 @@ import com.example.fitnesstrainerapp.screen2.DietPlanScreen
 import com.example.fitnesstrainerapp.screen2.LiveSessionScreen
 import com.example.fitnesstrainerapp.screen3.CaloriesCalculatorScreen
 import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
+import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : ComponentActivity() {
+    private lateinit var auth: FirebaseAuth
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        auth = FirebaseAuth.getInstance()
+
         setContent {
             FitnessTrainerAppTheme {
                 val navController = rememberNavController()
+                val context = LocalContext.current
 
                 NavHost(
                     navController = navController,
@@ -61,9 +69,22 @@ class MainActivity : ComponentActivity() {
                             onPasswordChange = { password = it },
                             isContinueButtonEnabled = isButtonEnabled,
                             onContinueClick = {
-                                navController.navigate("home/$email") {
-                                    popUpTo("welcome") { inclusive = true }
-                                }
+                                auth.createUserWithEmailAndPassword(email, password)
+                                    .addOnCompleteListener { task ->
+                                        if (task.isSuccessful) {
+                                            // Sign in success, update UI with the signed-in user's information
+                                            navController.navigate("home/$email") {
+                                                popUpTo("welcome") { inclusive = true }
+                                            }
+                                        } else {
+                                            // If sign in fails, display a message to the user.
+                                            Toast.makeText(
+                                                context,
+                                                "Authentication failed: ${task.exception?.message}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
                             },
                             onLoginClick = { navController.navigate("login") }
                         )
@@ -81,9 +102,22 @@ class MainActivity : ComponentActivity() {
                             onPasswordChange = { password = it },
                             isLoginButtonEnabled = isLoginEnabled,
                             onLoginClick = {
-                                navController.navigate("home/$email") {
-                                    popUpTo("welcome") { inclusive = true }
-                                }
+                                auth.signInWithEmailAndPassword(email, password)
+                                    .addOnCompleteListener { task ->
+                                        if (task.isSuccessful) {
+                                            // Sign in success, update UI with the signed-in user's information
+                                            navController.navigate("home/$email") {
+                                                popUpTo("welcome") { inclusive = true }
+                                            }
+                                        } else {
+                                            // If sign in fails, display a message to the user.
+                                            Toast.makeText(
+                                                context,
+                                                "Authentication failed: ${task.exception?.message}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
                             },
                             onSignUpClick = { navController.navigate("create_account") }
                         )
@@ -145,6 +179,7 @@ class MainActivity : ComponentActivity() {
                             userEmail = userEmail,
                             onNavigateBack = { navController.popBackStack() },
                             onLogoutClick = {
+                                auth.signOut()
                                 navController.navigate("welcome") {
                                     popUpTo(navController.graph.id) { inclusive = true }
                                 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "524814893933",
+    "project_id": "fitness-trainer-app-b1a32",
+    "storage_bucket": "fitness-trainer-app-b1a32.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:524814893933:android:43100e91f99c16ba3d1064",
+        "android_client_info": {
+          "package_name": "com.example.fitnesstrainerapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDtxWPPCA7DhvrZ1Dm36qZ6tUvYurLsxPU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
