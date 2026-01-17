@@ -72,12 +72,10 @@ class MainActivity : ComponentActivity() {
                                 auth.createUserWithEmailAndPassword(email, password)
                                     .addOnCompleteListener { task ->
                                         if (task.isSuccessful) {
-                                            // Sign in success, update UI with the signed-in user's information
                                             navController.navigate("home/$email") {
                                                 popUpTo("welcome") { inclusive = true }
                                             }
                                         } else {
-                                            // If sign in fails, display a message to the user.
                                             Toast.makeText(
                                                 context,
                                                 "Authentication failed: ${task.exception?.message}",
@@ -105,12 +103,10 @@ class MainActivity : ComponentActivity() {
                                 auth.signInWithEmailAndPassword(email, password)
                                     .addOnCompleteListener { task ->
                                         if (task.isSuccessful) {
-                                            // Sign in success, update UI with the signed-in user's information
                                             navController.navigate("home/$email") {
                                                 popUpTo("welcome") { inclusive = true }
                                             }
                                         } else {
-                                            // If sign in fails, display a message to the user.
                                             Toast.makeText(
                                                 context,
                                                 "Authentication failed: ${task.exception?.message}",
@@ -138,20 +134,14 @@ class MainActivity : ComponentActivity() {
                                 } else {
                                     route
                                 }
-
                                 navController.navigate(destination) {
                                     launchSingleTop = true
                                 }
                             },
-
-                            // ✅ FIXED: CATEGORY NAVIGATION
                             onCategoryClick = { route ->
                                 navController.navigate(route)
                             },
-
-                            onChallengeClick = { challengeId ->
-                                // Future challenge navigation
-                            }
+                            onChallengeClick = { challengeId -> }
                         )
                     }
 
@@ -190,18 +180,12 @@ class MainActivity : ComponentActivity() {
                     /* ---------------- OTHER SCREENS ---------------- */
 
                     composable("notifications") {
-                        InboxScreen(
-                            onNavigateBack = { navController.popBackStack() }
-                        )
+                        InboxScreen(onNavigateBack = { navController.popBackStack() })
                     }
 
                     composable("schedule") {
-                        ScheduleScreen(
-                            onNavigateBack = { navController.popBackStack() }
-                        )
+                        ScheduleScreen(onNavigateBack = { navController.popBackStack() })
                     }
-
-                    /* ---------------- DIET PLAN ---------------- */
 
                     composable("diet_plan") {
                         DietPlanScreen(
@@ -210,31 +194,25 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    /* ---------------- LIVE SESSION ---------------- */
                     composable("live_session") {
-                        LiveSessionScreen(
-                            onNavigateBack = {
-                                navController.popBackStack() // Go back to the previous screen (HomeScreen)
-                            }
-                        )
+                        LiveSessionScreen(onNavigateBack = { navController.popBackStack() })
                     }
 
                     composable("custom_plan") {
+                        val currentUserEmail = auth.currentUser?.email ?: ""
                         CustomPlanScreen(
                             onNavigateBack = { navController.popBackStack() },
-                            onNavigateToProfile = { navController.navigate("profile/{userEmail}") }
-                        )
-                    }
-
-
-                    composable("calories_calculator") {
-                        CaloriesCalculatorScreen(
-                            onNavigateBack = {
-                                navController.popBackStack() // Go back to DietPlanScreen
+                            onNavigateToProfile = {
+                                navController.navigate("profile/$currentUserEmail") {
+                                    popUpTo("home/$currentUserEmail") // Ensure back goes to home
+                                }
                             }
                         )
                     }
 
+                    composable("calories_calculator") {
+                        CaloriesCalculatorScreen(onNavigateBack = { navController.popBackStack() })
+                    }
                 }
             }
         }

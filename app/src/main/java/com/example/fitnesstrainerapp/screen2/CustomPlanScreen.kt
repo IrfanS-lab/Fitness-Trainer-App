@@ -36,29 +36,32 @@ import com.example.fitnesstrainerapp.data.WorkoutEntity
 import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
 import kotlinx.coroutines.launch
 
-// ... rest of the file stays the same
 // --- Data Model for a Custom Plan Exercise ---
 data class CustomExercise(
     val id: Int,
     val title: String,
     @DrawableRes val imageRes: Int,
-    val progress: Float // Added progress to the model
+    val progress: Float
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomPlanScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToProfile: () -> Unit // Callback to go to profile after starting
+    onNavigateToProfile: () -> Unit
 ) {
-    // Database and Coroutine Setup
     val context = LocalContext.current
     val db = AppDatabase.getDatabase(context)
     val scope = rememberCoroutineScope()
 
     val exercises = listOf(
         CustomExercise(1, "10 PUSH UP", R.drawable.workout_pushup, 0.7f),
-        CustomExercise(2, "10 SQUATS", R.drawable.workout_squat, 0.9f)
+        CustomExercise(2, "10 SQUATS", R.drawable.workout_squat, 0.9f),
+        CustomExercise(3, "15 SIDE SQUATS", R.drawable.workout_side_squat, 0.5f),
+        CustomExercise(4, "20 LUNGES", R.drawable.workout_3, 0.3f),
+        CustomExercise(5, "20 PUSH UP", R.drawable.workout_pushup, 0.1f),
+        CustomExercise(6, "25 SQUATS", R.drawable.workout_squat, 0.2f),
+        CustomExercise(7, "10 MIN JUMPING JACKS", R.drawable.workout_3, 0.0f)
     )
 
     Scaffold(
@@ -95,7 +98,6 @@ fun CustomPlanScreen(
                 CustomExerciseCard(
                     item = exercise,
                     onStartClick = {
-                        // SAVE TO DATABASE
                         scope.launch {
                             db.workoutDao().insertWorkout(
                                 WorkoutEntity(
@@ -104,7 +106,6 @@ fun CustomPlanScreen(
                                     imageRes = exercise.imageRes
                                 )
                             )
-                            // After saving, go to Profile screen
                             onNavigateToProfile()
                         }
                     }
@@ -148,7 +149,7 @@ fun CustomExerciseCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Button(
-                onClick = onStartClick, // Calls the database save logic
+                onClick = onStartClick,
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFEDE7F6),
