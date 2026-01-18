@@ -27,10 +27,12 @@ import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
-import com.example.fitnesstrainerapp.data.AppDatabase
-import com.example.fitnesstrainerapp.data.WorkoutEntity
 import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
 import kotlinx.coroutines.launch
+import com.example.fitnesstrainerapp.data.AppDatabase
+import com.example.fitnesstrainerapp.data.WorkoutEntity
+
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

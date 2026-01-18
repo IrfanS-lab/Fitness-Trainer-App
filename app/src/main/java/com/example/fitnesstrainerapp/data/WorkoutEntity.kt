@@ -9,5 +9,5 @@ data class WorkoutEntity(
     val name: String,
     val progress: Float,
     val imageRes: Int,
-    val timestamp: Long = System.currentTimeMillis() // To show newest first
+    val timestamp: Long = System.currentTimeMillis()
 )

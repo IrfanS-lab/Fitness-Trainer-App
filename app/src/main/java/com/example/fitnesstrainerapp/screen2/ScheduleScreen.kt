@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -17,31 +16,43 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.fitnesstrainerapp.data.ScheduleEntity
+import com.example.fitnesstrainerapp.data.AppDatabase
 import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
+import kotlinx.coroutines.launch
 import java.time.DayOfWeek
-import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.*
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleScreen(
     onNavigateBack: () -> Unit
 ) {
-    // State for the currently displayed month, initialized to the current month
+    val context = LocalContext.current
+    val db = remember { AppDatabase.getDatabase(context) }
+    val scope = rememberCoroutineScope()
+    
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
-    // Store marked days per month
-    var markedDaysPerMonth by remember {
-        mutableStateOf(mapOf(YearMonth.now() to setOf(15, 16, 17)))
+    
+    // Load all marked days from database
+    val allScheduledDays by db.scheduleDao().getAllScheduledDays().collectAsState(initial = emptyList())
+    
+    // Filter marked days for the current month view
+    val markedDays = remember(allScheduledDays, currentMonth) {
+        allScheduledDays
+            .filter { it.date.startsWith(currentMonth.toString()) }
+            .map { it.date.substringAfterLast("-").toInt() }
+            .toSet()
     }
 
     Scaffold(
@@ -62,30 +73,22 @@ fun ScheduleScreen(
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            // This would be a LazyColumn if you wanted to scroll through many months
-            Column {
-                CalendarView(
-                    yearMonth = currentMonth,
-                    onPrevMonth = { currentMonth = currentMonth.minusMonths(1) },
-                    onNextMonth = { currentMonth = currentMonth.plusMonths(1) },
-                    // Pass the marked days for the currently displayed month
-                    markedDays = markedDaysPerMonth[currentMonth] ?: emptySet(),
-                    onDayClick = { day ->
-                        val currentDays = markedDaysPerMonth[currentMonth] ?: emptySet()
-                        val newDays = if (currentDays.contains(day)) {
-                            currentDays - day
+            CalendarView(
+                yearMonth = currentMonth,
+                onPrevMonth = { currentMonth = currentMonth.minusMonths(1) },
+                onNextMonth = { currentMonth = currentMonth.plusMonths(1) },
+                markedDays = markedDays,
+                onDayClick = { day ->
+                    val dateString = String.format("%s-%02d", currentMonth.toString(), day)
+                    scope.launch {
+                        if (markedDays.contains(day)) {
+                            db.scheduleDao().deleteSchedule(dateString)
                         } else {
-                            currentDays + day
+                            db.scheduleDao().insertSchedule(ScheduleEntity(dateString, true))
                         }
-                        // Update the map with the new set of marked days for the current month
-                        markedDaysPerMonth = markedDaysPerMonth + (currentMonth to newDays)
                     }
-                )
-
-                // You could add more months here if needed
-                // Spacer(modifier = Modifier.height(24.dp))
-                // CalendarView( ... for next month ... )
-            }
+                }
+            )
         }
     }
 }
@@ -100,24 +103,14 @@ fun CalendarView(
 ) {
     val daysInMonth = yearMonth.lengthOfMonth()
     val firstDayOfMonth = yearMonth.atDay(1).dayOfWeek
-    // Calculate the number of empty cells needed at the beginning of the month
     val emptyCells = (firstDayOfMonth.value % 7)
 
     Column {
-        MonthHeader(
-            yearMonth = yearMonth,
-            onPrev = onPrevMonth,
-            onNext = onNextMonth
-        )
+        MonthHeader(yearMonth = yearMonth, onPrev = onPrevMonth, onNext = onNextMonth)
         Spacer(modifier = Modifier.height(16.dp))
         DayOfWeekHeader()
         Spacer(modifier = Modifier.height(8.dp))
-        CalendarGrid(
-            daysInMonth = daysInMonth,
-            emptyCells = emptyCells,
-            markedDays = markedDays,
-            onDayClick = onDayClick
-        )
+        CalendarGrid(daysInMonth = daysInMonth, emptyCells = emptyCells, markedDays = markedDays, onDayClick = onDayClick)
     }
 }
 
@@ -129,28 +122,16 @@ fun MonthHeader(yearMonth: YearMonth, onPrev: () -> Unit, onNext: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        IconButton(onClick = onPrev) {
-            Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Month")
-        }
-        Text(
-            text = yearMonth.format(formatter).uppercase(),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-        IconButton(onClick = onNext) {
-            Icon(Icons.Default.ChevronRight, contentDescription = "Next Month")
-        }
+        IconButton(onClick = onPrev) { Icon(Icons.Default.ChevronLeft, contentDescription = "Prev") }
+        Text(text = yearMonth.format(formatter).uppercase(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        IconButton(onClick = onNext) { Icon(Icons.Default.ChevronRight, contentDescription = "Next") }
     }
 }
 
 @Composable
 fun DayOfWeekHeader() {
     Row(modifier = Modifier.fillMaxWidth()) {
-        val days = DayOfWeek.values()
-        // Adjust for locale if needed, e.g., starting on Monday
-        val adjustedDays = days.drop(0) + days.take(0) // Simple rotation logic if needed
-
-        for (day in adjustedDays) {
+        DayOfWeek.values().forEach { day ->
             Text(
                 text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
                 modifier = Modifier.weight(1f),
@@ -168,46 +149,26 @@ fun CalendarGrid(daysInMonth: Int, emptyCells: Int, markedDays: Set<Int>, onDayC
         columns = GridCells.Fixed(7),
         modifier = Modifier.height(((daysInMonth + emptyCells + 6) / 7 * 50).dp)
     ) {
-        // 1. Empty cells
         items(emptyCells) {
-            Box(
-                modifier = Modifier
-                    .size(50.dp)
-                    .border(0.5.dp, Color.LightGray)
-            )
+            Box(modifier = Modifier.size(50.dp).border(0.5.dp, Color.LightGray))
         }
-
-        // 2. Day cells
         items(daysInMonth) { day ->
             val dateNumber = day + 1
             val isMarked = dateNumber in markedDays
-
             Box(
                 modifier = Modifier
                     .size(50.dp)
                     .background(Color(0xFFFFEBEE))
                     .border(0.5.dp, Color.White)
                     .clickable { onDayClick(dateNumber) }
-                // We removed contentAlignment here to use specific aligns below
             ) {
-                // The Number: Always Black, Always Centered
-                Text(
-                    text = dateNumber.toString(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.Black,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-
-                // The Star: Smaller, Bottom Right
+                Text(text = dateNumber.toString(), modifier = Modifier.align(Alignment.Center))
                 if (isMarked) {
                     Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = "Marked",
+                        Icons.Default.Star,
+                        contentDescription = null,
                         tint = Color(0xFF6A1B9A),
-                        modifier = Modifier
-                            .size(16.dp) // Much smaller size
-                            .align(Alignment.BottomEnd) // Puts it in bottom right corner
-                            .padding(2.dp) // Slight padding so it doesn't touch the edge
+                        modifier = Modifier.size(16.dp).align(Alignment.BottomEnd).padding(2.dp)
                     )
                 }
             }
@@ -215,11 +176,8 @@ fun CalendarGrid(daysInMonth: Int, emptyCells: Int, markedDays: Set<Int>, onDayC
     }
 }
 
-
 @Preview(showBackground = true)
 @Composable
 fun ScheduleScreenPreview() {
-    FitnessTrainerAppTheme {
-        ScheduleScreen(onNavigateBack = {})
-    }
+    FitnessTrainerAppTheme { ScheduleScreen(onNavigateBack = {}) }
 }
