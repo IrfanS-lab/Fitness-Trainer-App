@@ -1,14 +1,16 @@
 package com.example.fitnesstrainerapp.screen2
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,7 +26,6 @@ import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
 
 // --- Data Models for Notifications ---
 
-// A sealed interface to represent different types of notifications
 sealed interface Notification {
     val id: Int
 }
@@ -43,28 +44,54 @@ data class ProgressNotification(
     val progressInfo: String
 ) : Notification
 
-// --- Main Screen Composable ---
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InboxScreen(
     onNavigateBack: () -> Unit
 ) {
-    // This data would typically come from a ViewModel
-    val newNotifications = listOf(
-        MessageNotification(1, "Trainer: Maya S", "replied to your question", R.drawable.coach1),
-        MessageNotification(2, "Trainer: Maya S", "replied to your question", R.drawable.coach1),
-        ProgressNotification(3, "Next progress", "50% to complete the workout"),
-        ProgressNotification(4, "Next progress", "50% to complete the workout")
-    )
-    val oldNotifications = listOf(
-        MessageNotification(5, "Trainer: Maya S", "replied to your question", R.drawable.coach3),
-        MessageNotification(6, "Trainer: Alex J", "has a few messages", R.drawable.coach2),
-        ProgressNotification(7, "Next progress", "100% completed"),
-        MessageNotification(8, "Trainer: Alex J", "has a few messages", R.drawable.coach2, unreadCount = 3),
-        MessageNotification(9, "Trainer: Alex J", "has a few messages", R.drawable.coach2, unreadCount = 3),
-        ProgressNotification(10, "Next progress", "100% completed")
-    )
+    // State management for notifications
+    var notifications by remember {
+        mutableStateOf(listOf(
+            MessageNotification(1, "Trainer: Maya S", "replied to your question", R.drawable.coach1),
+            MessageNotification(2, "Trainer: Maya S", "replied to your question", R.drawable.coach1),
+            ProgressNotification(3, "Next progress", "50% to complete the workout"),
+            ProgressNotification(4, "Next progress", "50% to complete the workout"),
+            MessageNotification(5, "Trainer: Maya S", "replied to your question", R.drawable.coach3),
+            MessageNotification(6, "Trainer: Alex J", "has a few messages", R.drawable.coach2),
+            ProgressNotification(7, "Next progress", "100% completed"),
+            MessageNotification(8, "Trainer: Alex J", "has a few messages", R.drawable.coach2, unreadCount = 3)
+        ))
+    }
+
+    var selectedNotification by remember { mutableStateOf<Notification?>(null) }
+
+    // Dialog for showing notification details
+    selectedNotification?.let { notification ->
+        AlertDialog(
+            onDismissRequest = { selectedNotification = null },
+            title = {
+                Text(
+                    text = when (notification) {
+                        is MessageNotification -> notification.trainerName
+                        is ProgressNotification -> notification.title
+                    }
+                )
+            },
+            text = {
+                Text(
+                    text = when (notification) {
+                        is MessageNotification -> notification.message
+                        is ProgressNotification -> notification.progressInfo
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedNotification = null }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -73,6 +100,17 @@ fun InboxScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    // Button to add a new demo message
+                    TextButton(onClick = {
+                        val newId = (notifications.maxOfOrNull { it.id } ?: 0) + 1
+                        notifications = listOf(
+                            MessageNotification(newId, "System", "New workout tip added!", R.drawable.logo_fitness)
+                        ) + notifications
+                    }) {
+                        Text("Add")
                     }
                 }
             )
@@ -83,42 +121,42 @@ fun InboxScreen(
                 .fillMaxSize()
                 .padding(paddingValues),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // New Notifications Section
             item {
                 Text(
-                    text = "NEW NOTIFICATIONS",
+                    text = "ALL NOTIFICATIONS",
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = 8.dp)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-            items(newNotifications, key = { "new_${it.id}" }) { notification ->
-                NotificationItem(notification = notification)
             }
 
-            // Old Notifications Section
-            item {
-                Text(
-                    text = "OLD NOTIFICATIONS",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-            items(oldNotifications, key = { "old_${it.id}" }) { notification ->
-                NotificationItem(notification = notification)
+            items(notifications, key = { it.id }) { notification ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selectedNotification = notification }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        NotificationItem(notification = notification)
+                    }
+                    IconButton(onClick = {
+                        notifications = notifications.filter { it.id != notification.id }
+                    }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Gray)
+                    }
+                }
+                Divider(color = Color.LightGray.copy(alpha = 0.5f))
             }
         }
     }
 }
 
-// --- Reusable Notification Item Composable ---
-
 @Composable
 fun NotificationItem(notification: Notification) {
-    // Use a 'when' statement to display the correct composable for each notification type
     when (notification) {
         is MessageNotification -> MessageNotificationItem(notification = notification)
         is ProgressNotification -> ProgressNotificationItem(notification = notification)
@@ -130,16 +168,14 @@ fun NotificationItem(notification: Notification) {
 fun MessageNotificationItem(notification: MessageNotification) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.fillMaxWidth()
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         BadgedBox(
             badge = {
                 if (notification.unreadCount != null) {
-                    Badge(
-                        containerColor = Color.Red,
-                        contentColor = Color.White
-                    ) { Text(text = notification.unreadCount.toString()) }
+                    Badge(containerColor = Color.Red, contentColor = Color.White) {
+                        Text(text = notification.unreadCount.toString())
+                    }
                 }
             }
         ) {
@@ -161,17 +197,11 @@ fun MessageNotificationItem(notification: MessageNotification) {
 
 @Composable
 fun ProgressNotificationItem(notification: ProgressNotification) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp) // Aligns with avatar-based items
-    ) {
+    Column {
         Text(text = notification.title, fontWeight = FontWeight.Bold)
         Text(text = notification.progressInfo, color = Color.Gray, fontSize = 14.sp)
     }
 }
-
-// --- Preview ---
 
 @Preview(showBackground = true, widthDp = 360)
 @Composable
