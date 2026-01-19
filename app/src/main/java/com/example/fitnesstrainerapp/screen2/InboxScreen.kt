@@ -12,6 +12,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,10 +29,13 @@ import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 
-// --- Updated Data Models for Firestore ---
+// --- Data Models ---
+
+// NEW: Data class to represent a trainer
+data class Trainer(val name: String, val avatarRes: Int)
 
 sealed interface Notification {
-    val id: String // Changed to String for Firestore document IDs
+    val id: String
 }
 
 data class MessageNotification(
@@ -40,7 +45,6 @@ data class MessageNotification(
     val avatarRes: Int = R.drawable.coach1,
     val unreadCount: Int? = null
 ) : Notification {
-    // Helper function to convert Firestore map to object
     companion object {
         fun fromMap(id: String, map: Map<String, Any?>): MessageNotification {
             return MessageNotification(
@@ -79,35 +83,42 @@ fun InboxScreen(
     var notifications by remember { mutableStateOf<List<Notification>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // Fetch notifications from Firestore
+    // Hardcoded list of trainers. This could also be fetched from Firestore.
+    val trainers = listOf(
+        Trainer("Emily", R.drawable.coach1),
+        Trainer("David", R.drawable.coach2),
+        Trainer("Sarah", R.drawable.coach3)
+    )
+
     LaunchedEffect(Unit) {
         db.collection("notifications")
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING) // Sort by most recent
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
                     Log.w("Firestore", "Listen failed.", e)
+                    isLoading = false
                     return@addSnapshotListener
                 }
 
                 if (snapshot != null) {
-                    val fetchedNotifications = snapshot.documents.map { doc ->
-                        val data = doc.data ?: emptyMap()
+                    val fetchedNotifications = snapshot.documents.mapNotNull { doc ->
+                        val data = doc.data ?: return@mapNotNull null
                         val type = data["type"] as? String
-                        if (type == "progress") {
-                            ProgressNotification.fromMap(doc.id, data)
-                        } else {
-                            MessageNotification.fromMap(doc.id, data)
+                        when (type) {
+                            "progress" -> ProgressNotification.fromMap(doc.id, data)
+                            "message" -> MessageNotification.fromMap(doc.id, data)
+                            else -> null
                         }
                     }
                     notifications = fetchedNotifications
-                    isLoading = false
                 }
+                isLoading = false
             }
     }
 
     var selectedNotification by remember { mutableStateOf<Notification?>(null) }
     var showAddDialog by remember { mutableStateOf(false) }
 
-    // Dialog view logic
     selectedNotification?.let { notification ->
         AlertDialog(
             onDismissRequest = { selectedNotification = null },
@@ -137,13 +148,15 @@ fun InboxScreen(
     }
 
     if (showAddDialog) {
+        // UPDATED: Pass the list of trainers to the dialog
         AddMessageDialog(
+            trainers = trainers,
             onDismiss = { showAddDialog = false },
-            onConfirm = { name, content ->
+            onConfirm = { selectedTrainer, content ->
                 val newNotification = hashMapOf(
-                    "senderName" to name,
+                    "senderName" to selectedTrainer.name,
                     "message" to content,
-                    "avatarRes" to R.drawable.coach1,
+                    "avatarRes" to selectedTrainer.avatarRes,
                     "unreadCount" to 1,
                     "type" to "message",
                     "timestamp" to com.google.firebase.Timestamp.now()
@@ -216,25 +229,55 @@ fun InboxScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddMessageDialog(
+    trainers: List<Trainer>, // Pass the list of trainers
     onDismiss: () -> Unit,
-    onConfirm: (String, String) -> Unit
+    onConfirm: (Trainer, String) -> Unit // Return a Trainer object
 ) {
-    var senderName by remember { mutableStateOf("") }
+    var selectedTrainer by remember { mutableStateOf<Trainer?>(null) }
     var messageContent by remember { mutableStateOf("") }
+    var isDropdownExpanded by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Create New Message", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = senderName,
-                    onValueChange = { senderName = it },
-                    label = { Text("Sender name") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Dropdown menu for selecting a trainer
+                ExposedDropdownMenuBox(
+                    expanded = isDropdownExpanded,
+                    onExpandedChange = { isDropdownExpanded = !isDropdownExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = selectedTrainer?.name ?: "",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Select trainer") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = isDropdownExpanded)
+                        },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = isDropdownExpanded,
+                        onDismissRequest = { isDropdownExpanded = false }
+                    ) {
+                        trainers.forEach { trainer ->
+                            DropdownMenuItem(
+                                text = { Text(trainer.name) },
+                                onClick = {
+                                    selectedTrainer = trainer
+                                    isDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = messageContent,
                     onValueChange = { messageContent = it },
@@ -245,8 +288,9 @@ fun AddMessageDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(senderName, messageContent) },
-                enabled = senderName.isNotBlank() && messageContent.isNotBlank()
+                onClick = { selectedTrainer?.let { onConfirm(it, messageContent) } },
+                // Button is enabled only when a trainer and a message are present
+                enabled = selectedTrainer != null && messageContent.isNotBlank()
             ) {
                 Text("Send")
             }
@@ -276,7 +320,7 @@ fun MessageNotificationItem(notification: MessageNotification) {
     ) {
         BadgedBox(
             badge = {
-                if (notification.unreadCount != null) {
+                if (notification.unreadCount != null && notification.unreadCount > 0) {
                     Badge(containerColor = Color.Red, contentColor = Color.White) {
                         Text(text = notification.unreadCount.toString())
                     }
@@ -294,7 +338,7 @@ fun MessageNotificationItem(notification: MessageNotification) {
         }
         Column {
             Text(text = notification.senderName, fontWeight = FontWeight.Bold)
-            Text(text = notification.message, color = Color.Gray, fontSize = 14.sp)
+            Text(text = notification.message, color = Color.Gray, fontSize = 14.sp, maxLines = 1)
         }
     }
 }
@@ -303,7 +347,7 @@ fun MessageNotificationItem(notification: MessageNotification) {
 fun ProgressNotificationItem(notification: ProgressNotification) {
     Column {
         Text(text = notification.title, fontWeight = FontWeight.Bold)
-        Text(text = notification.progressInfo, color = Color.Gray, fontSize = 14.sp)
+        Text(text = notification.progressInfo, color = Color.Gray, fontSize = 14.sp, maxLines = 1)
     }
 }
 
