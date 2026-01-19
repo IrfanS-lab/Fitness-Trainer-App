@@ -29,10 +29,18 @@ import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
-import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
-import kotlinx.coroutines.launch
 import com.example.fitnesstrainerapp.data.AppDatabase
 import com.example.fitnesstrainerapp.data.WorkoutEntity
+import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.min
 
 
@@ -45,6 +53,9 @@ fun ProfileScreen(
     val context = LocalContext.current
     val db = remember { AppDatabase.getDatabase(context) }
     val scope = rememberCoroutineScope()
+    // Add Firebase instances
+    val auth = Firebase.auth
+    val firestore = Firebase.firestore
 
     // Observe workout history from the database (Flow automatically updates UI)
     val workoutHistory by db.workoutDao().getAllWorkouts().collectAsState(initial = emptyList())
@@ -107,15 +118,18 @@ fun ProfileScreen(
                                 db.workoutDao().deleteWorkout(workout)
                             }
                         },
-                        // NEW: Handle the update action
                         onUpdate = {
                             scope.launch {
-                                // Calculate new progress, ensuring it doesn't exceed 1.0f (100%)
+                                // 1. Update local Room database
                                 val newProgress = min(workout.progress + 0.1f, 1.0f)
-                                // Create a copy of the workout with the updated progress
                                 val updatedWorkout = workout.copy(progress = newProgress)
-                                // Update the entity in the database
                                 db.workoutDao().updateWorkout(updatedWorkout)
+
+                                // 2. Save the date to Firebase
+                                val userId = auth.currentUser?.uid
+                                if (userId != null) {
+                                    saveDateToFirebase(firestore, userId)
+                                }
                             }
                         }
                     )
@@ -124,6 +138,31 @@ fun ProfileScreen(
         }
     }
 }
+
+// NEW: Function to save the workout date to Firestore
+private suspend fun saveDateToFirebase(firestore: com.google.firebase.firestore.FirebaseFirestore, userId: String) {
+    // Use a simple date format as the document ID (e.g., "2026-01-19")
+    // This prevents duplicate entries for the same day.
+    val dateId = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+
+    val workoutDate = mapOf(
+        "userId" to userId,
+        "completedAt" to FieldValue.serverTimestamp() // Store the precise time
+    )
+
+    // Using .set() on a document with a specific ID will create it or overwrite it.
+    // This is ideal for ensuring only one entry per user per day.
+    try {
+        firestore.collection("workout_dates")
+            .document("$userId-$dateId") // Unique ID per user per day
+            .set(workoutDate)
+            .await()
+    } catch (e: Exception) {
+        // Handle potential exceptions, e.g., network issues
+        e.printStackTrace()
+    }
+}
+
 
 @Composable
 fun EditUsernameDialog(currentName: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
@@ -254,3 +293,4 @@ fun ProfileScreenPreview() {
         ProfileScreen(userEmail = "preview@example.com", onNavigateBack = {})
     }
 }
+
