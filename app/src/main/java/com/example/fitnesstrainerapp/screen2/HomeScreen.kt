@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -30,7 +31,7 @@ import com.example.fitnesstrainerapp.R
 import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
 
 // --- Data classes to model the UI state ---
-data class Challenge(val id: Int, val title: String, val imageUrl: String)
+data class Challenge(val id: Int, val title: String, val imageUrl: String, val websiteUrl: String)
 data class BottomNavItem(val label: String, val icon: ImageVector, val route: String)
 data class Category(val title: String, val route: String) // Added a route for navigation
 
@@ -40,18 +41,30 @@ fun HomeScreen(
     // Hoist navigation events up to MainActivity
     onNavItemClick: (String) -> Unit,
     onCategoryClick: (String) -> Unit,
-    onChallengeClick: (Int) -> Unit
+    onChallengeClick: (String) -> Unit
 ) {
     // State should ideally come from a ViewModel
     var searchQuery by remember { mutableStateOf("") }
+    val uriHandler = LocalUriHandler.current
+
     val categories = listOf(
         Category("CUSTOM\nPLAN", "custom_plan"),
         Category("LIVE\nSESSION", "live_session"),
         Category("DIET\nPLAN", "diet_plan")
     )
     val challenges = listOf(
-        Challenge(1, "7 Day Full Body Workout", "https://images.pexels.com/photos/2294361/pexels-photo-2294361.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"),
-        Challenge(2, "30 Day Abs Challenge", "https://images.pexels.com/photos/3775131/pexels-photo-3775131.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1")
+        Challenge(
+            1,
+            "7 Day Full Body Workout",
+            "https://images.pexels.com/photos/2294361/pexels-photo-2294361.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+            "https://www.muscleandstrength.com/workouts/7-day-full-body-workout"
+        ),
+        Challenge(
+            2,
+            "30 Day Abs Challenge",
+            "https://images.pexels.com/photos/3775131/pexels-photo-3775131.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+            "https://www.muscleandfitness.com/workout-plan/workouts/workout-routines/30-day-abs-challenge/"
+        )
     )
     val bottomNavItems = listOf(
         BottomNavItem("Settings", Icons.Default.Settings, "settings"),
@@ -112,7 +125,10 @@ fun HomeScreen(
             items(challenges, key = { it.id }) { challenge ->
                 ChallengeCard(
                     challenge = challenge,
-                    onClick = { onChallengeClick(challenge.id) }
+                    onClick = {
+                        onChallengeClick(challenge.websiteUrl)
+                        uriHandler.openUri(challenge.websiteUrl)
+                    }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -163,7 +179,9 @@ fun WorkoutBanner() {
             fontWeight = FontWeight.ExtraBold,
             fontSize = 24.sp,
             lineHeight = 28.sp,
-            modifier = Modifier.padding(20.dp).align(Alignment.CenterStart)
+            modifier = Modifier
+                .padding(20.dp)
+                .align(Alignment.CenterStart)
         )
     }
 }
