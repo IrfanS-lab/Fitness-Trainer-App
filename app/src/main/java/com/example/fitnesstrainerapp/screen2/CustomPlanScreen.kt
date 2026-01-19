@@ -102,7 +102,7 @@ fun CustomPlanScreen(
                             db.workoutDao().insertWorkout(
                                 WorkoutEntity(
                                     name = exercise.title,
-                                    progress = exercise.progress,
+                                    progress = 0f, // Always start with 0 progress
                                     imageRes = exercise.imageRes
                                 )
                             )

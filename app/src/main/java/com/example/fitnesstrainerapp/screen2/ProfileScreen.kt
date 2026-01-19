@@ -14,6 +14,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,7 +33,7 @@ import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
 import kotlinx.coroutines.launch
 import com.example.fitnesstrainerapp.data.AppDatabase
 import com.example.fitnesstrainerapp.data.WorkoutEntity
-
+import kotlin.math.min
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,7 +45,7 @@ fun ProfileScreen(
     val context = LocalContext.current
     val db = remember { AppDatabase.getDatabase(context) }
     val scope = rememberCoroutineScope()
-    
+
     // Observe workout history from the database (Flow automatically updates UI)
     val workoutHistory by db.workoutDao().getAllWorkouts().collectAsState(initial = emptyList())
 
@@ -104,6 +106,17 @@ fun ProfileScreen(
                             scope.launch {
                                 db.workoutDao().deleteWorkout(workout)
                             }
+                        },
+                        // NEW: Handle the update action
+                        onUpdate = {
+                            scope.launch {
+                                // Calculate new progress, ensuring it doesn't exceed 1.0f (100%)
+                                val newProgress = min(workout.progress + 0.1f, 1.0f)
+                                // Create a copy of the workout with the updated progress
+                                val updatedWorkout = workout.copy(progress = newProgress)
+                                // Update the entity in the database
+                                db.workoutDao().updateWorkout(updatedWorkout)
+                            }
                         }
                     )
                 }
@@ -161,8 +174,9 @@ fun UserInfoHeader(name: String, email: String, onEditClick:() -> Unit) {
     }
 }
 
+// UPDATED: Added onUpdate lambda
 @Composable
-fun WorkoutProgressCard(workout: WorkoutEntity, onDelete: () -> Unit) {
+fun WorkoutProgressCard(workout: WorkoutEntity, onDelete: () -> Unit, onUpdate: () -> Unit) {
     val context = LocalContext.current
     val imageLoader = remember {
         ImageLoader.Builder(context)
@@ -190,7 +204,7 @@ fun WorkoutProgressCard(workout: WorkoutEntity, onDelete: () -> Unit) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete Workout", tint = Color.LightGray)
             }
         }
-        
+
         AsyncImage(
             model = workout.imageRes,
             contentDescription = workout.name,
@@ -199,12 +213,18 @@ fun WorkoutProgressCard(workout: WorkoutEntity, onDelete: () -> Unit) {
             contentScale = ContentScale.Fit
         )
         Spacer(modifier = Modifier.height(12.dp))
+
+        // Progress Bar
         Box(
             modifier = Modifier.fillMaxWidth().height(24.dp).clip(RoundedCornerShape(12.dp)).background(Color.LightGray),
             contentAlignment = Alignment.CenterStart
         ) {
             Box(
-                modifier = Modifier.fillMaxWidth(workout.progress).height(24.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.primary)
+                modifier = Modifier
+                    .fillMaxWidth(workout.progress)
+                    .height(24.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primary)
             )
             Text(
                 text = "${(workout.progress * 100).toInt()}%",
@@ -212,6 +232,17 @@ fun WorkoutProgressCard(workout: WorkoutEntity, onDelete: () -> Unit) {
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.Center)
             )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // NEW: Update button
+        Button(
+            onClick = onUpdate,
+            modifier = Modifier.fillMaxWidth(),
+            // Disable the button if progress is already 100%
+            enabled = workout.progress < 1.0f
+        ) {
+            Text("UPDATE PROGRESS (+10%)")
         }
     }
 }
