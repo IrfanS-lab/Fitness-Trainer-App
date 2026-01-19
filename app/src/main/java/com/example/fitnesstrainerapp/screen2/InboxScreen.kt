@@ -32,7 +32,7 @@ sealed interface Notification {
 
 data class MessageNotification(
     override val id: Int,
-    val trainerName: String,
+    val senderName: String,
     val message: String,
     val avatarRes: Int,
     val unreadCount: Int? = null
@@ -52,29 +52,29 @@ fun InboxScreen(
     // State management for notifications
     var notifications by remember {
         mutableStateOf(listOf(
+            MessageNotification(0, "Group Project ICT602 2025", "Putri Uitm: 4. Apk", R.drawable.coach2, unreadCount = 1),
             MessageNotification(1, "Trainer: Maya S", "replied to your question", R.drawable.coach1),
-            MessageNotification(2, "Trainer: Maya S", "replied to your question", R.drawable.coach1),
             ProgressNotification(3, "Next progress", "50% to complete the workout"),
-            ProgressNotification(4, "Next progress", "50% to complete the workout"),
             MessageNotification(5, "Trainer: Maya S", "replied to your question", R.drawable.coach3),
             MessageNotification(6, "Trainer: Alex J", "has a few messages", R.drawable.coach2),
-            ProgressNotification(7, "Next progress", "100% completed"),
-            MessageNotification(8, "Trainer: Alex J", "has a few messages", R.drawable.coach2, unreadCount = 3)
+            ProgressNotification(7, "Next progress", "100% completed")
         ))
     }
 
     var selectedNotification by remember { mutableStateOf<Notification?>(null) }
+    var showAddDialog by remember { mutableStateOf(false) }
 
-    // Dialog for showing notification details
+    // Dialog untuk melihat butiran mesej
     selectedNotification?.let { notification ->
         AlertDialog(
             onDismissRequest = { selectedNotification = null },
             title = {
                 Text(
                     text = when (notification) {
-                        is MessageNotification -> notification.trainerName
+                        is MessageNotification -> notification.senderName
                         is ProgressNotification -> notification.title
-                    }
+                    },
+                    fontWeight = FontWeight.Bold
                 )
             },
             text = {
@@ -87,8 +87,22 @@ fun InboxScreen(
             },
             confirmButton = {
                 TextButton(onClick = { selectedNotification = null }) {
-                    Text("OK")
+                    Text("Close")
                 }
+            }
+        )
+    }
+
+    // Dialog untuk menambah mesej baru
+    if (showAddDialog) {
+        AddMessageDialog(
+            onDismiss = { showAddDialog = false },
+            onConfirm = { name, content ->
+                val newId = (notifications.maxOfOrNull { it.id } ?: 0) + 1
+                notifications = listOf(
+                    MessageNotification(newId, name, content, R.drawable.coach1, unreadCount = 1)
+                ) + notifications
+                showAddDialog = false
             }
         )
     }
@@ -103,14 +117,8 @@ fun InboxScreen(
                     }
                 },
                 actions = {
-                    // Button to add a new demo message
-                    TextButton(onClick = {
-                        val newId = (notifications.maxOfOrNull { it.id } ?: 0) + 1
-                        notifications = listOf(
-                            MessageNotification(newId, "System", "New workout tip added!", R.drawable.logo_fitness)
-                        ) + notifications
-                    }) {
-                        Text("Add")
+                    TextButton(onClick = { showAddDialog = true }) {
+                        Text("Add", fontWeight = FontWeight.Bold)
                     }
                 }
             )
@@ -156,6 +164,49 @@ fun InboxScreen(
 }
 
 @Composable
+fun AddMessageDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, String) -> Unit
+) {
+    var senderName by remember { mutableStateOf("") }
+    var messageContent by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Create New Message", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = senderName,
+                    onValueChange = { senderName = it },
+                    label = { Text("Sender message") }, // Label diringkaskan
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = messageContent,
+                    onValueChange = { messageContent = it },
+                    label = { Text("Type a message") }, // Label diringkaskan
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(senderName, messageContent) },
+                enabled = senderName.isNotBlank() && messageContent.isNotBlank()
+            ) {
+                Text("Send")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
 fun NotificationItem(notification: Notification) {
     when (notification) {
         is MessageNotification -> MessageNotificationItem(notification = notification)
@@ -181,7 +232,7 @@ fun MessageNotificationItem(notification: MessageNotification) {
         ) {
             Image(
                 painter = painterResource(id = notification.avatarRes),
-                contentDescription = notification.trainerName,
+                contentDescription = notification.senderName,
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape),
@@ -189,7 +240,7 @@ fun MessageNotificationItem(notification: MessageNotification) {
             )
         }
         Column {
-            Text(text = notification.trainerName, fontWeight = FontWeight.Bold)
+            Text(text = notification.senderName, fontWeight = FontWeight.Bold)
             Text(text = notification.message, color = Color.Gray, fontSize = 14.sp)
         }
     }
