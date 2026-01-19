@@ -1,5 +1,6 @@
 package com.example.fitnesstrainerapp.screen2
 
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,48 +24,90 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.fitnesstrainerapp.R
 import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 
-// --- Data Models for Notifications ---
+// --- Updated Data Models for Firestore ---
 
 sealed interface Notification {
-    val id: Int
+    val id: String // Changed to String for Firestore document IDs
 }
 
 data class MessageNotification(
-    override val id: Int,
-    val senderName: String,
-    val message: String,
-    val avatarRes: Int,
+    override val id: String = "",
+    val senderName: String = "",
+    val message: String = "",
+    val avatarRes: Int = R.drawable.coach1,
     val unreadCount: Int? = null
-) : Notification
+) : Notification {
+    // Helper function to convert Firestore map to object
+    companion object {
+        fun fromMap(id: String, map: Map<String, Any?>): MessageNotification {
+            return MessageNotification(
+                id = id,
+                senderName = map["senderName"] as? String ?: "",
+                message = map["message"] as? String ?: "",
+                avatarRes = (map["avatarRes"] as? Long)?.toInt() ?: R.drawable.coach1,
+                unreadCount = (map["unreadCount"] as? Long)?.toInt()
+            )
+        }
+    }
+}
 
 data class ProgressNotification(
-    override val id: Int,
-    val title: String,
-    val progressInfo: String
-) : Notification
+    override val id: String = "",
+    val title: String = "",
+    val progressInfo: String = ""
+) : Notification {
+    companion object {
+        fun fromMap(id: String, map: Map<String, Any?>): ProgressNotification {
+            return ProgressNotification(
+                id = id,
+                title = map["title"] as? String ?: "",
+                progressInfo = map["progressInfo"] as? String ?: ""
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InboxScreen(
     onNavigateBack: () -> Unit
 ) {
-    // State management for notifications
-    var notifications by remember {
-        mutableStateOf(listOf(
-            MessageNotification(0, "Group Project ICT602 2025", "Putri Uitm: 4. Apk", R.drawable.coach2, unreadCount = 1),
-            MessageNotification(1, "Trainer: Maya S", "replied to your question", R.drawable.coach1),
-            ProgressNotification(3, "Next progress", "50% to complete the workout"),
-            MessageNotification(5, "Trainer: Maya S", "replied to your question", R.drawable.coach3),
-            MessageNotification(6, "Trainer: Alex J", "has a few messages", R.drawable.coach2),
-            ProgressNotification(7, "Next progress", "100% completed")
-        ))
+    val db = Firebase.firestore
+    var notifications by remember { mutableStateOf<List<Notification>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    // Fetch notifications from Firestore
+    LaunchedEffect(Unit) {
+        db.collection("notifications")
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.w("Firestore", "Listen failed.", e)
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null) {
+                    val fetchedNotifications = snapshot.documents.map { doc ->
+                        val data = doc.data ?: emptyMap()
+                        val type = data["type"] as? String
+                        if (type == "progress") {
+                            ProgressNotification.fromMap(doc.id, data)
+                        } else {
+                            MessageNotification.fromMap(doc.id, data)
+                        }
+                    }
+                    notifications = fetchedNotifications
+                    isLoading = false
+                }
+            }
     }
 
     var selectedNotification by remember { mutableStateOf<Notification?>(null) }
     var showAddDialog by remember { mutableStateOf(false) }
 
-    // Dialog untuk melihat butiran mesej
+    // Dialog view logic
     selectedNotification?.let { notification ->
         AlertDialog(
             onDismissRequest = { selectedNotification = null },
@@ -93,15 +136,19 @@ fun InboxScreen(
         )
     }
 
-    // Dialog untuk menambah mesej baru
     if (showAddDialog) {
         AddMessageDialog(
             onDismiss = { showAddDialog = false },
             onConfirm = { name, content ->
-                val newId = (notifications.maxOfOrNull { it.id } ?: 0) + 1
-                notifications = listOf(
-                    MessageNotification(newId, name, content, R.drawable.coach1, unreadCount = 1)
-                ) + notifications
+                val newNotification = hashMapOf(
+                    "senderName" to name,
+                    "message" to content,
+                    "avatarRes" to R.drawable.coach1,
+                    "unreadCount" to 1,
+                    "type" to "message",
+                    "timestamp" to com.google.firebase.Timestamp.now()
+                )
+                db.collection("notifications").add(newNotification)
                 showAddDialog = false
             }
         )
@@ -124,40 +171,46 @@ fun InboxScreen(
             )
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                Text(
-                    text = "ALL NOTIFICATIONS",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
             }
-
-            items(notifications, key = { it.id }) { notification ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedNotification = notification }
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        NotificationItem(notification = notification)
-                    }
-                    IconButton(onClick = {
-                        notifications = notifications.filter { it.id != notification.id }
-                    }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Gray)
-                    }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
+                    Text(
+                        text = "ALL NOTIFICATIONS",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
                 }
-                Divider(color = Color.LightGray.copy(alpha = 0.5f))
+
+                items(notifications, key = { it.id }) { notification ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedNotification = notification }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            NotificationItem(notification = notification)
+                        }
+                        IconButton(onClick = {
+                            db.collection("notifications").document(notification.id).delete()
+                        }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Gray)
+                        }
+                    }
+                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+                }
             }
         }
     }
@@ -179,13 +232,13 @@ fun AddMessageDialog(
                 OutlinedTextField(
                     value = senderName,
                     onValueChange = { senderName = it },
-                    label = { Text("Sender message") }, // Label diringkaskan
+                    label = { Text("Sender name") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = messageContent,
                     onValueChange = { messageContent = it },
-                    label = { Text("Type a message") }, // Label diringkaskan
+                    label = { Text("Type a message") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }

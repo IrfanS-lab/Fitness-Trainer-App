@@ -18,22 +18,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.ImageLoader
 import coil.compose.AsyncImage
-import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import com.example.fitnesstrainerapp.R
-import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
 
-// --- Data Model for a Live Session Item ---
+// --- Data Model ---
 data class LiveSessionItem(
     val id: Int,
-    @DrawableRes val imageRes: Int // Can be a GIF or PNG
+    @field:DrawableRes val imageRes: Int,
+    val youtubeUrl: String
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,10 +40,28 @@ data class LiveSessionItem(
 fun LiveSessionScreen(
     onNavigateBack: () -> Unit
 ) {
-    // This data would typically come from a ViewModel or API
+    // Updated list of live sessions with specific YouTube URLs for each workout
     val liveSessions = listOf(
-        LiveSessionItem(1, R.drawable.workout_squat),
-        LiveSessionItem(2, R.drawable.workout_pushup)
+        LiveSessionItem(
+            id = 1,
+            imageRes = R.drawable.workout_squat,
+            youtubeUrl = "https://www.youtube.com/watch?v=aclHkVaku9U" // Squat tutorial
+        ),
+        LiveSessionItem(
+            id = 2,
+            imageRes = R.drawable.workout_pushup,
+            youtubeUrl = "https://www.youtube.com/watch?v=IODxDxX7oi4" // Pushup tutorial
+        ),
+        LiveSessionItem(
+            id = 3,
+            imageRes = R.drawable.workout_side_squat,
+            youtubeUrl = "https://youtu.be/Pe115ryKDwQ?si=qPnkAq8y2V07rUtK" // Side Squat tutorial
+        ),
+        LiveSessionItem(
+            id = 4,
+            imageRes = R.drawable.workout_3,
+            youtubeUrl = "https://youtu.be/5yrRws8Du1k?si=Xyr2mAnfNaMGU1qv" // Another workout tutorial
+        )
     )
 
     Scaffold(
@@ -66,12 +83,8 @@ fun LiveSessionScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // 1. Top Banner Card
-            item {
-                LiveSessionBanner()
-            }
+            item { LiveSessionBanner() }
 
-            // 2. "LIVE SESSION" Header
             item {
                 Text(
                     text = "LIVE SESSION",
@@ -81,7 +94,6 @@ fun LiveSessionScreen(
                 )
             }
 
-            // 3. List of Live Session Workouts
             items(liveSessions, key = { it.id }) { sessionItem ->
                 LiveWorkoutCard(item = sessionItem)
             }
@@ -89,7 +101,54 @@ fun LiveSessionScreen(
     }
 }
 
-// --- Reusable Sub-Components ---
+@Composable
+fun LiveWorkoutCard(item: LiveSessionItem) {
+    val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+
+    val imageLoader = ImageLoader.Builder(context)
+        .components {
+            if (Build.VERSION.SDK_INT >= 28) {
+                add(ImageDecoderDecoder.Factory())
+            }
+            // Note: For older APIs, you might need a different decoder like coil-gif
+            // if you are loading GIFs, but for static drawables this is generally fine.
+        }
+        .build()
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        AsyncImage(
+            model = item.imageRes,
+            contentDescription = "Live Workout",
+            imageLoader = imageLoader,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp),
+            contentScale = ContentScale.Fit
+        )
+
+        Button(
+            onClick = {
+                uriHandler.openUri(item.youtubeUrl)
+            },
+            modifier = Modifier.align(Alignment.Start),
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFFEDE7F6),
+                contentColor = Color(0xFF673AB7)
+            ),
+            contentPadding = PaddingValues(horizontal = 24.dp)
+        ) {
+            Icon(Icons.Default.PlayArrow, contentDescription = "Start")
+            Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+            Text("START", fontWeight = FontWeight.Bold)
+        }
+    }
+}
 
 @Composable
 fun LiveSessionBanner() {
@@ -102,15 +161,14 @@ fun LiveSessionBanner() {
     ) {
         Box(contentAlignment = Alignment.CenterStart) {
             Image(
-                painter = painterResource(id = R.drawable.custom_plan_banner), // Your banner image
+                painter = painterResource(id = R.drawable.custom_plan_banner),
                 contentDescription = "Start your live session",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
-            // Scrim for better text readability
             Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.2f)))
             Text(
-                text = "START YOUR\nLIVE SESSION",
+                text = "START YOUR LIVE SESSION",
                 color = Color.White,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold,
@@ -118,62 +176,5 @@ fun LiveSessionBanner() {
                 modifier = Modifier.padding(20.dp)
             )
         }
-    }
-}
-
-@Composable
-fun LiveWorkoutCard(item: LiveSessionItem) {
-    // Custom ImageLoader is essential for playing GIFs.
-    val context = LocalContext.current
-    val imageLoader = ImageLoader.Builder(context)
-        .components {
-            if (Build.VERSION.SDK_INT >= 28) {
-                add(ImageDecoderDecoder.Factory())
-            } else {
-                add(GifDecoder.Factory())
-            }
-        }
-        .build()
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // The GIF/Image display
-        AsyncImage(
-            model = item.imageRes,
-            contentDescription = "Live Workout",
-            imageLoader = imageLoader,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp),
-            contentScale = ContentScale.Fit
-        )
-        // The "Start" button
-        Button(
-            onClick = { /* TODO: Handle Start button click */ },
-            modifier = Modifier.align(Alignment.Start),
-            shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFEDE7F6), // Light purple
-                contentColor = Color(0xFF673AB7)    // Darker purple
-            ),
-            contentPadding = PaddingValues(horizontal = 24.dp)
-        ) {
-            Icon(Icons.Default.PlayArrow, contentDescription = "Start")
-            Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
-            Text("START", fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-// --- Preview ---
-
-@Preview(showBackground = true)
-@Composable
-fun LiveSessionScreenPreview() {
-    FitnessTrainerAppTheme {
-        LiveSessionScreen(onNavigateBack = {})
     }
 }
