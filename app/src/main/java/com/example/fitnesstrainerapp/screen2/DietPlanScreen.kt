@@ -97,7 +97,10 @@ fun DietPlanScreen(
             item {
                 DietCard(
                     imageRes = R.drawable.daily_tip_1,
-                    title = "30 DAYS HEALTHY\nLIFESTYLE\nEATING PLAN"
+                    title = "30 DAYS HEALTHY\nLIFESTYLE\nEATING PLAN",
+                    onClick = {
+                        uriHandler.openUri("https://www.mountsinai.org/files/MSHealth/Assets/HS/MonthlyMealPlan_Brochure_Rev24.pdf")
+                    }
                 )
             }
 
