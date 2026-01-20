@@ -6,6 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.NavType
@@ -24,9 +26,14 @@ import com.example.fitnesstrainerapp.screen2.ScheduleScreen
 import com.example.fitnesstrainerapp.screen2.ProfileScreen
 import com.example.fitnesstrainerapp.screen2.DietPlanScreen
 import com.example.fitnesstrainerapp.screen2.LiveSessionScreen
+import com.example.fitnesstrainerapp.screen2.AddItemScreen
+import com.example.fitnesstrainerapp.screen2.Notification
 import com.example.fitnesstrainerapp.screen3.CaloriesCalculatorScreen
 import com.example.fitnesstrainerapp.ui.theme.FitnessTrainerAppTheme
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.firestore.ktx.toObject
+import com.google.firebase.ktx.Firebase
 
 class MainActivity : ComponentActivity() {
     private lateinit var auth: FirebaseAuth
@@ -141,7 +148,56 @@ class MainActivity : ComponentActivity() {
                             onCategoryClick = { route ->
                                 navController.navigate(route)
                             },
-                            onChallengeClick = { challengeId -> }
+                            onChallengeClick = { challengeId -> /* Handle Challenge Click */ }
+                        )
+                    }
+
+                    /* ---------------- INBOX ---------------- */
+
+                    composable("notifications") {
+                        val db = Firebase.firestore
+                        var notifications by remember { mutableStateOf<List<Notification>>(emptyList()) }
+                        val trainers = listOf("David", "Sarah", "Emily", "John") // You can fetch this from Firebase too
+
+                        // Fetch initial messages
+                        LaunchedEffect(Unit) {
+                            db.collection("messages")
+                                .orderBy("timestamp")
+                                .addSnapshotListener { snapshots, e ->
+                                    if (e != null) {
+                                        // Handle error
+                                        return@addSnapshotListener
+                                    }
+
+                                    val messageList = snapshots?.mapNotNull {
+                                        it.toObject<Notification>()
+                                    } ?: emptyList()
+                                    notifications = messageList
+                                }
+                        }
+
+                        InboxScreen(
+                            notifications = notifications,
+                            onNavigateBack = { navController.popBackStack() },
+                            onDeleteItemClick = { senderName ->
+                                db.collection("messages").whereEqualTo("senderName", senderName)
+                                    .get()
+                                    .addOnSuccessListener { documents ->
+                                        for (document in documents) {
+                                            db.collection("messages").document(document.id).delete()
+                                        }
+                                    }
+                            },
+                            onMessageSend = { recipient, message ->
+                                val newMessage = Notification(
+                                    senderName = recipient,
+                                    message = message,
+                                    timestamp = System.currentTimeMillis(),
+                                    senderImageUrl = "" // Add image URL if you have it
+                                )
+                                db.collection("messages").add(newMessage)
+                            },
+                            trainers = trainers
                         )
                     }
 
@@ -179,12 +235,17 @@ class MainActivity : ComponentActivity() {
 
                     /* ---------------- OTHER SCREENS ---------------- */
 
-                    composable("notifications") {
-                        InboxScreen(onNavigateBack = { navController.popBackStack() })
+                    composable("schedule") {
+                        ScheduleScreen(
+                            onNavigateBack = { navController.popBackStack() },
+                            onAddItemClick = { navController.navigate("add_item") }
+                        )
                     }
 
-                    composable("schedule") {
-                        ScheduleScreen(onNavigateBack = { navController.popBackStack() })
+                    composable("add_item") {
+                        AddItemScreen(
+                            onNavigateBack = { navController.popBackStack() }
+                        )
                     }
 
                     composable("diet_plan") {
@@ -204,7 +265,7 @@ class MainActivity : ComponentActivity() {
                             onNavigateBack = { navController.popBackStack() },
                             onNavigateToProfile = {
                                 navController.navigate("profile/$currentUserEmail") {
-                                    popUpTo("home/$currentUserEmail") // Ensure back goes to home
+                                    popUpTo("home/$currentUserEmail")
                                 }
                             }
                         )

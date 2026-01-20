@@ -36,7 +36,8 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onAddItemClick: () -> Unit
 ) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getDatabase(context) }
@@ -179,5 +180,6 @@ fun CalendarGrid(daysInMonth: Int, emptyCells: Int, markedDays: Set<Int>, onDayC
 @Preview(showBackground = true)
 @Composable
 fun ScheduleScreenPreview() {
-    FitnessTrainerAppTheme { ScheduleScreen(onNavigateBack = {}) }
+    FitnessTrainerAppTheme { ScheduleScreen(onNavigateBack = {},
+        onAddItemClick = {}) }
 }
